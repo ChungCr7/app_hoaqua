@@ -2,16 +2,19 @@ const express = require("express");
 const router = express.Router();
 const userController = require("../app/controllers/userApiController");
 
-// ❌ Bỏ kiểm tra quyền admin
-// const isAdmin = require("../app/middlewares/is-auth-admin");
+// ✅ GET tất cả người dùng, POST để tạo người dùng
+router
+  .route("/")
+  .get(userController.getAllUsers)    // GET /api/users
+  .post(userController.createUser);   // POST /api/users
 
-// ✅ Ai cũng có thể lấy danh sách users (hoặc bạn có thể thêm isAuth nếu cần)
-router.get("/", userController.getAllUsers);
+// ✅ PUT để cập nhật, DELETE để xoá người dùng theo ID
+router
+  .route("/:id")
+  .put(userController.updateUser)     // PUT /api/users/:id
+  .delete(userController.deleteUser); // DELETE /api/users/:id
 
-// Các route khác
-router.post("/login", userController.loginUser);
-router.post("/create", userController.createUser);
-router.put("/update/:id", userController.updateUser);
-router.delete("/delete/:id", userController.deleteUser);
+// ✅ Route đăng nhập riêng biệt
+router.post("/login", userController.loginUser); // POST /api/users/login
 
 module.exports = router;
