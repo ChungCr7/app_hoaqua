@@ -1,0 +1,39 @@
+<div class="body"
+    style="margin: 200px 35%; border: 1px solid rgb(36, 202, 72); width: 500px; box-shadow: 5px 5px 10px rgba(0, 0, 0, 0.5);">
+    <div class="container-form" style="padding: 50px;">
+        <h1 style="text-align: center;">Đăng ký</h1>
+        <p style="text-align: center; font-weight: 350; font-size: 15px; margin-bottom: 25px">
+            Nếu bạn chưa có tài khoản, đăng ký tại đây
+        </p>
+        {{#if errorMessage}}
+        <div class="user-message-error">{{errorMessage}}</div>
+        {{/if}}
+        <form class="login-form" action="/dang-ky" method="POST" novalidate>
+            <div class="form-group">
+                <label for="firstname">Họ</label>
+                <input class="form-control form-auth" type="firstname" id="firstname" name="firstname"
+                    value="{{oldInput.firstname}}"></input>
+            </div>
+            <div class="form-group">
+                <label for="lastname">Tên</label>
+                <input class="form-control form-auth" type="lastname" id="lastname" name="lastname"
+                    value="{{oldInput.lastname}}"></input>
+            </div>
+            <div class="form-group">
+                <label for="email">Email</label>
+                <input class="form-control form-auth" type="email" id="email" name="email"
+                    value="{{oldInput.email}}"></input>
+            </div>
+            <div class="form-group">
+                <label for="password">Mật khẩu</label>
+                <input type="password" class="form-control form-auth" id="password" name="password">
+            </div>
+            <div class="form-group">
+                <label for="confirmPassword">Xác nhận mật khẩu</label>
+                <input type="password" class="form-control form-auth" id="confirmPassword" name="confirmPassword">
+            </div>
+
+            <button type="submit" class="btn btn-primary">Đăng ký</button>
+        </form>
+    </div>
+</div>
