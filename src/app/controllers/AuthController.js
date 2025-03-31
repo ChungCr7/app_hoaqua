@@ -1,6 +1,5 @@
 require('dotenv').config(); 
 const crypto = require('crypto');
-const bcrypt = require('bcryptjs');
 const nodemailer = require('nodemailer');
 const sendgridTransport = require('nodemailer-sendgrid-transport');
 const { validationResult } = require('express-validator/check');
@@ -35,26 +34,18 @@ class AuthController {
 
     User.findOne({ email })
       .then(user => {
-        if (!user) {
+        if (!user || user.password !== password) {
           return res.status(422).render('auth/login', {
             errorMessage: 'Email hoặc mật khẩu không hợp lệ!',
             oldInput: { email, password },
             validationErrors: []
           });
         }
-        return bcrypt.compare(password, user.password).then(doMatch => {
-          if (doMatch) {
-            req.session.isLoggedIn = true;
-            req.session.user = user;
-            req.session.role = user.role;
-            return req.session.save(() => res.redirect('/'));
-          }
-          return res.status(422).render('auth/login', {
-            errorMessage: 'Email hoặc mật khẩu không hợp lệ!',
-            oldInput: { email, password },
-            validationErrors: []
-          });
-        });
+
+        req.session.isLoggedIn = true;
+        req.session.user = user;
+        req.session.role = user.role;
+        return req.session.save(() => res.redirect('/'));
       })
       .catch(next);
   }
@@ -83,18 +74,16 @@ class AuthController {
       });
     }
 
-    bcrypt.hash(password, 12)
-      .then(hashedPassword => {
-        const user = new User({
-          firstname,
-          lastname,
-          email,
-          password: hashedPassword,
-          role: 2,
-          cart: { items: [] }
-        });
-        return user.save();
-      })
+    const user = new User({
+      firstname,
+      lastname,
+      email,
+      password, // lưu thẳng chuỗi mật khẩu không mã hóa
+      role: 2,
+      cart: { items: [] }
+    });
+
+    user.save()
       .then(() => {
         res.redirect('/dang-nhap');
         return transporter.sendMail({
@@ -170,10 +159,8 @@ class AuthController {
     })
       .then(user => {
         resetUser = user;
-        return bcrypt.hash(password, 12);
-      })
-      .then(hashedPassword => {
-        resetUser.password = hashedPassword;
+        // không hash lại mật khẩu
+        resetUser.password = password;
         resetUser.resetToken = undefined;
         resetUser.resetTokenExpiration = undefined;
         return resetUser.save();
