@@ -1,12 +1,14 @@
 const express = require("express");
 const router = express.Router();
 const userController = require("../app/controllers/userApiController");
-const isAdmin = require("../app/middlewares/is-auth-admin"); // ✅ import middleware admin
 
-// 🔐 Chỉ admin mới được truy cập danh sách users
-router.get("/", isAdmin, userController.getAllUsers);
+// ❌ Bỏ kiểm tra quyền admin
+// const isAdmin = require("../app/middlewares/is-auth-admin");
 
-// Các route khác dùng chung
+// ✅ Ai cũng có thể lấy danh sách users (hoặc bạn có thể thêm isAuth nếu cần)
+router.get("/", userController.getAllUsers);
+
+// Các route khác
 router.post("/login", userController.loginUser);
 router.post("/create", userController.createUser);
 router.put("/update/:id", userController.updateUser);
