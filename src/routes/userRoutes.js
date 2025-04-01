@@ -4,7 +4,7 @@ const userController = require("../app/controllers/userApiController");
 const multer = require("multer");
 const path = require("path");
 
-// Cấu hình multer để lưu file avatar và kiểm tra loại file
+// Cấu hình multer để lưu file avatar
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, "public/uploads/avatars"); // thư mục lưu ảnh
@@ -14,20 +14,7 @@ const storage = multer.diskStorage({
   },
 });
 
-const upload = multer({
-  storage,
-  fileFilter: (req, file, cb) => {
-    const fileTypes = /jpeg|jpg|png|webp|gif/;
-    const extName = fileTypes.test(path.extname(file.originalname).toLowerCase());
-    const mimeType = fileTypes.test(file.mimetype);
-
-    if (extName && mimeType) {
-      cb(null, true);
-    } else {
-      cb(new Error("Chỉ cho phép tải lên các file ảnh (jpg, jpeg, png, webp, gif)"));
-    }
-  }
-});
+const upload = multer({ storage });
 
 // GET tất cả người dùng, POST để tạo người dùng
 router
