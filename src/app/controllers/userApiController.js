@@ -162,3 +162,35 @@ exports.deleteUser = async (req, res) => {
     res.status(500).json({ message: "Error deleting user" });
   }
 };
+// Cập nhật avatar
+exports.updateAvatar = async (req, res) => {
+  try {
+    const userId = req.params.id;
+
+    // Kiểm tra xem có file được gửi lên không
+    if (!req.file) {
+      return res.status(400).json({ message: "No avatar file uploaded" });
+    }
+
+    // Lưu đường dẫn file ảnh
+    const avatarPath = `/uploads/avatars/${req.file.filename}`;
+
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { avatar: avatarPath },
+      { new: true }
+    );
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.status(200).json({
+      message: "Avatar updated successfully",
+      avatar: avatarPath,
+    });
+  } catch (err) {
+    console.log("Error updating avatar:", err);
+    res.status(500).json({ message: "Error updating avatar", error: err });
+  }
+};

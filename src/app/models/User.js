@@ -1,4 +1,3 @@
-// src/app/models/User.js
 const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 
@@ -11,6 +10,7 @@ const userSchema = new Schema(
     phone: { type: String },
     address: { type: String },
     country: { type: String },
+    avatar: { type: String, default: "" }, // Thêm dòng này để lưu ảnh đại diện
     resetToken: String,
     resetTokenExpiration: Date,
     role: { type: Number, default: 2 }, // 1 = admin, 2 = user
