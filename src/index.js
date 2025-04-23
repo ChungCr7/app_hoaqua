@@ -1,69 +1,72 @@
 const path = require("path");
 const express = require("express");
 const morgan = require("morgan");
-var methodOverride = require("method-override");
-const handlebars = require("express-handlebars");
+const methodOverride = require("method-override");
 const session = require("express-session");
 const MongoDBStore = require("connect-mongodb-session")(session);
 const cors = require("cors");
 const flash = require("connect-flash");
 
+const handlebars = require("express-handlebars");
+const { allowInsecurePrototypeAccess } = require("@handlebars/allow-prototype-access");
+const Handlebars = require("handlebars");
 
 const SortMiddleware = require("./app/middlewares/sortMiddleware");
 
 const User = require("./app/models/User");
-const route = require("./routes"); // tự nạp file index
+const route = require("./routes");
 const db = require("./config/db");
 
 const app = express();
-app.use(
-  cors({
-    origin: "*", // Cho phép tất cả các nguồn truy cập. Có thể thay bằng địa chỉ cụ thể nếu cần bảo mật.
-    methods: ["GET", "POST", "PUT", "DELETE"], // Các phương thức được phép sử dụng
-    allowedHeaders: ["Content-Type", "Authorization"],
-  })
-);
-// Connect to DB
+
+// Enable CORS
+app.use(cors({
+  origin: "*",
+  methods: ["GET", "POST", "PUT", "DELETE"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+}));
+
+// Connect to MongoDB
 db.connect()
-  .then((result) => {
+  .then(() => {
     const port = 3000;
     app.listen(port, () => {
       console.log(`Example app listening on port ${port}`);
     });
   })
-  .catch();
+  .catch(err => console.error("Database connection error:", err));
 
 const store = new MongoDBStore({
   uri: "mongodb+srv://baochungas3s:RhyPvXQXQpFoSKPJ@cluster0.aqlfw.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0",
   collection: "sessions",
 });
 
+// Static files
 app.use(express.static(path.join(__dirname, "public")));
 app.use("/uploads", express.static(path.join(__dirname, "public", "uploads")));
 
-app.use(
-  session({
-    secret: "my secret",
-    resave: false,
-    saveUninitialized: false,
-    store: store,
-  })
-);
-
+// Session & flash
+app.use(session({
+  secret: "my secret",
+  resave: false,
+  saveUninitialized: false,
+  store: store,
+}));
 app.use(flash());
 
-app.use((req, res, next) => {
-  if (!req.session.user) {
-    return next();
+// Middleware: Lấy user từ session
+app.use(async (req, res, next) => {
+  if (!req.session.user) return next();
+  try {
+    const user = await User.findById(req.session.user._id);
+    req.user = user;
+    next();
+  } catch (err) {
+    next(err);
   }
-  User.findById(req.session.user._id)
-    .then((user) => {
-      req.user = user;
-      next();
-    })
-    .catch();
 });
 
+// Middleware: truyền thông tin vào view
 app.use((req, res, next) => {
   res.locals.isAuthenticated = req.session.isLoggedIn;
   res.locals.isAuthenticatedAdmin = req.session.role - 2;
@@ -71,37 +74,23 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(
-  express.urlencoded({
-    extended: true,
-  })
-);
+// Middleware khác
+app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
-
 app.use(methodOverride("_method"));
-
-//Custom middlewares
 app.use(SortMiddleware);
-
-// HTTP logger
 app.use(morgan("combined"));
 
-// Template engine
-app.engine(
-  "hbs",
-  handlebars.engine({
-    extname: ".hbs",
-    helpers: require("./helpers/handlebars"),
-  })
-);
-
+// Template engine setup
+app.engine("hbs", handlebars.engine({
+  extname: ".hbs",
+  handlebars: allowInsecurePrototypeAccess(Handlebars),
+  helpers: require("./helpers/handlebars"),
+}));
 app.set("view engine", "hbs");
 app.set("views", path.join(__dirname, "resources", "views"));
 
-// Route API cho user
-
-
-// Rotes init
+// Routes init
 route(app);
-const userRoutes=require('./routes/userRoutes')
+const userRoutes = require("./routes/userRoutes");
 app.use("/api/users", userRoutes);

@@ -6,19 +6,15 @@ const path = require("path");
 
 const ITEMS_PER_PAGE = 15;
 
-const { mongooseToObjiect } = require("../../util/mongoose");
-const { mutipleMongooseToObject } = require("../../util/mongoose");
+const { mongooseToObject, mutipleMongooseToObject } = require("../../util/mongoose");
 
 class AdminController {
-  // [GET] /admin/create
   create(req, res, next) {
     res.render("admin/create");
   }
 
-  // [POST] /admin/store
   store(req, res, next) {
-    console.log(req.files.length);
-    if (req.files.length != 4) {
+    if (req.files.length !== 4) {
       return res.render("admin/create", {
         errorMessage: "Vui lòng tải lên 4 ảnh!",
         oldInput: {
@@ -28,73 +24,60 @@ class AdminController {
           price: req.body.price,
         },
       });
-    } else {
-      req.body.img = req.files.map((file) =>
-        path.join("uploads", file.filename).replace(/\\/g, "/")
-      );
-      console.log(req.files);
-      console.log(req.body);
-      const product = new Product({
-        product_type: req.body.product_type,
-        name: req.body.name,
-        description: req.body.description,
-        img: req.body.img,
-        thuong_hieu: req.body.thuong_hieu,
-        tinh_trang: req.body.tinh_trang,
-        price: req.body.price,
-        userId: req.user,
-      });
-      product
-        .save()
-        .then(() => res.redirect("/admin/stored/products"))
-        .catch(next);
     }
-  }
 
-  // [GET] /admin/:id/edit
-  edit(req, res, next) {
-    Product.findById(req.params.id)
-      .then((product) =>
-        res.render("admin/edit", {
-          product: mongooseToObjiect(product),
-        })
-      )
+    req.body.img = req.files.map(file => path.join("uploads", file.filename).replace(/\\/g, "/"));
+
+    const product = new Product({
+      product_type: req.body.product_type,
+      name: req.body.name,
+      description: req.body.description,
+      img: req.body.img,
+      thuong_hieu: req.body.thuong_hieu,
+      tinh_trang: req.body.tinh_trang,
+      price: req.body.price,
+      userId: req.user,
+    });
+
+    product.save()
+      .then(() => res.redirect("/admin/stored/products"))
       .catch(next);
   }
 
-  // [PUT] /admin/:id
+  edit(req, res, next) {
+    Product.findById(req.params.id)
+      .then(product => res.render("admin/edit", { product: mongooseToObject(product) }))
+      .catch(next);
+  }
+
   update(req, res, next) {
     Product.updateOne({ _id: req.params.id }, req.body)
       .then(() => res.redirect("/admin/stored/products"))
       .catch(next);
   }
 
-  // [DELETE] /:id
   destroy(req, res, next) {
     Product.delete({ _id: req.params.id })
       .then(() => res.redirect("back"))
       .catch(next);
   }
 
-  // [DELETE] /:id/force
   forceDestroy(req, res, next) {
     Product.deleteOne({ _id: req.params.id })
       .then(() => res.redirect("back"))
       .catch(next);
   }
 
-  // [PATCH] /:id/restore
   restore(req, res, next) {
     Product.restore({ _id: req.params.id })
       .then(() => res.redirect("back"))
       .catch(next);
   }
 
-  // [POST] /handle-form-actions
   handleFormActions(req, res, next) {
     switch (req.body.action) {
       case "delete":
-        Product.delete({ _id: { $in: req.body.productIds } }) // req.body.courseIds là mảng
+        Product.delete({ _id: { $in: req.body.productIds } })
           .then(() => res.redirect("back"))
           .catch(next);
         break;
@@ -109,7 +92,7 @@ class AdminController {
     Promise.all([
       Product.find()
         .count()
-        .then((numProducts) => {
+        .then(numProducts => {
           totalItems = numProducts;
           return Product.find({})
             .skip((page - 1) * ITEMS_PER_PAGE)
@@ -118,27 +101,25 @@ class AdminController {
         }),
       Product.countDocumentsDeleted(),
     ])
-      .then(([products, deletedCount]) =>
-        res.render("admin/stored-products", {
-          products: mutipleMongooseToObject(products),
-          deletedCount,
-          currentPage: page,
-          hasNextPage: ITEMS_PER_PAGE * page < totalItems,
-          hasPreviousPage: page > 1,
-          nextPage: page + 1,
-          previousPage: page - 1,
-          lastPage: Math.ceil(totalItems / ITEMS_PER_PAGE),
-        })
-      )
+      .then(([products, deletedCount]) => res.render("admin/stored-products", {
+        products: mutipleMongooseToObject(products),
+        deletedCount,
+        currentPage: page,
+        hasNextPage: ITEMS_PER_PAGE * page < totalItems,
+        hasPreviousPage: page > 1,
+        nextPage: page + 1,
+        previousPage: page - 1,
+        lastPage: Math.ceil(totalItems / ITEMS_PER_PAGE),
+      }))
       .catch(next);
   }
 
   trashProducts(req, res, next) {
-    Product.findDeleted({}).then((products) => {
-      res.render("admin/trash-products", {
+    Product.findDeleted({})
+      .then(products => res.render("admin/trash-products", {
         products: mutipleMongooseToObject(products),
-      });
-    });
+      }))
+      .catch(next);
   }
 
   updateStatusCart(req, res, next) {
@@ -150,11 +131,9 @@ class AdminController {
   getOrders(req, res, next) {
     Order.find({})
       .sortable(req)
-      .then((orders) =>
-        res.render("order", {
-          orders: mutipleMongooseToObject(orders),
-        })
-      )
+      .then(orders => res.render("order", {
+        orders: mutipleMongooseToObject(orders),
+      }))
       .catch(next);
   }
 
@@ -163,13 +142,14 @@ class AdminController {
   }
 
   getNews(req, res, next) {
-    Promise.all([Story.find({}).sortable(req), Story.countDocumentsDeleted()])
-      .then(([stories, deletedCount]) =>
-        res.render("admin/news", {
-          stories: mutipleMongooseToObject(stories),
-          deletedCount,
-        })
-      )
+    Promise.all([
+      Story.find({}).sortable(req),
+      Story.countDocumentsDeleted(),
+    ])
+      .then(([stories, deletedCount]) => res.render("admin/news", {
+        stories: mutipleMongooseToObject(stories),
+        deletedCount,
+      }))
       .catch(next);
   }
 
@@ -189,19 +169,17 @@ class AdminController {
         userId: req.user._id,
       },
     });
-    story
-      .save()
+
+    story.save()
       .then(() => res.redirect("/admin/news"))
       .catch(next);
   }
 
   editNews(req, res, next) {
     Story.findById(req.params.id)
-      .then((story) =>
-        res.render("admin/edit-news", {
-          story: mongooseToObjiect(story),
-        })
-      )
+      .then(story => res.render("admin/edit-news", {
+        story: mongooseToObject(story),
+      }))
       .catch(next);
   }
 
@@ -218,11 +196,11 @@ class AdminController {
   }
 
   trashNews(req, res, next) {
-    Story.findDeleted({}).then((stories) => {
-      res.render("admin/trash-news", {
+    Story.findDeleted({})
+      .then(stories => res.render("admin/trash-news", {
         stories: mutipleMongooseToObject(stories),
-      });
-    });
+      }))
+      .catch(next);
   }
 
   restoreNews(req, res, next) {
@@ -240,7 +218,7 @@ class AdminController {
   postFeedback(req, res, next) {
     Rating.updateOne({ _id: req.params.id }, { feedback: req.body.feedback })
       .then(() => res.redirect("back"))
-      .catch();
+      .catch(next);
   }
 }
 

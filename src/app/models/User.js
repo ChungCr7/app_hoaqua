@@ -10,59 +10,59 @@ const userSchema = new Schema(
     phone: { type: String },
     address: { type: String },
     country: { type: String },
-    avatar: { type: String, default: "" }, // Thêm dòng này để lưu ảnh đại diện
+    avatar: { type: String, default: "" },
     resetToken: String,
     resetTokenExpiration: Date,
     role: { type: Number, default: 2 }, // 1 = admin, 2 = user
     cart: {
       items: [
         {
-          productId: { type: Schema.Types.ObjectId, ref: 'Product', required: true },
-          quantity: { type: Number },
+          productId: { type: Schema.Types.ObjectId, ref: 'Product', required: true }, // ✅ Đã sửa
+          quantity: { type: Number, default: 1 },
         },
       ],
     },
   },
-  {
-    timestamps: true,
-  }
+  { timestamps: true }
 );
 
 // METHOD: Thêm sản phẩm vào giỏ
 userSchema.methods.addToCart = function (product, quantity) {
+  const productId = product._id.toString();
+  console.log("🛒 Cart items:", this.cart.items);
+
   const cartProductIndex = this.cart.items.findIndex(cp => {
-    return cp.productId.toString() === product._id.toString();
+    return cp.productId && cp.productId.toString() === productId;
   });
 
-  let newQuantity = Number(quantity);
   const updatedCartItems = [...this.cart.items];
+  const qty = Number(quantity) || 1;
 
   if (cartProductIndex >= 0) {
-    newQuantity = this.cart.items[cartProductIndex].quantity + newQuantity;
-    updatedCartItems[cartProductIndex].quantity = newQuantity;
+    updatedCartItems[cartProductIndex].quantity += qty;
   } else {
     updatedCartItems.push({
-      quantity: newQuantity,
-      productId: product._id,
+      productId: product._id, // giữ nguyên ObjectId
+      quantity: qty,
     });
   }
 
-  this.cart = { items: updatedCartItems };
-  return this.save();
-};
-
-// METHOD: Xoá sản phẩm khỏi giỏ
-userSchema.methods.removeFromCart = function (productId) {
-  const updatedCartItems = this.cart.items.filter(item => {
-    return item.productId.toString() !== productId.toString();
-  });
   this.cart.items = updatedCartItems;
   return this.save();
 };
 
-// METHOD: Xoá toàn bộ giỏ
+
+// METHOD: Xoá sản phẩm khỏi giỏ hàng
+userSchema.methods.removeFromCart = function (productId) {
+  this.cart.items = this.cart.items.filter(
+    item => item.productId.toString() !== productId.toString()
+  );
+  return this.save();
+};
+
+// METHOD: Xoá toàn bộ giỏ hàng
 userSchema.methods.clearCart = function () {
-  this.cart = { items: [] };
+  this.cart.items = [];
   return this.save();
 };
 

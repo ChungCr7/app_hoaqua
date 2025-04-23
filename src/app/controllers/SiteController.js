@@ -5,36 +5,26 @@ const Rating = require("../models/Rating");
 const User = require("../models/User");
 const path = require("path");
 
-const { mutipleMongooseToObject } = require("../../util/mongoose");
-const { mongooseToObjiect } = require("../../util/mongoose");
+const { mutipleMongooseToObject, mongooseToObject } = require("../../util/mongoose");
 
 class SiteController {
+  // [GET] /api/search
   apiSearch(req, res, next) {
     const keyword = req.query.keyword;
     if (!keyword) {
-      return res
-        .status(400)
-        .json({ message: "Vui lòng nhập từ khóa tìm kiếm" });
+      return res.status(400).json({ message: "Vui lòng nhập từ khóa tìm kiếm" });
     }
 
-    Product.find({
-      name: { $regex: keyword, $options: "i" },
-    })
-      .then((productsSearch) => {
-        res.json({
-          success: true,
-          data: productsSearch,
-        });
-      })
+    Product.find({ name: { $regex: keyword, $options: "i" } })
+      .then(productsSearch => res.json({ success: true, data: productsSearch }))
       .catch(next);
   }
 
+  // [GET] /search
   search(req, res, next) {
     const keyword = req.query.keyword;
-    Product.find({
-      name: { $regex: keyword, $options: "i" },
-    })
-      .then((productsSearch) => {
+    Product.find({ name: { $regex: keyword, $options: "i" } })
+      .then(productsSearch => {
         res.render("search", {
           productsSearch: mutipleMongooseToObject(productsSearch),
         });
@@ -42,97 +32,121 @@ class SiteController {
       .catch(next);
   }
 
-  //[GET] /huong-dan-mua-hang
-  shoppingGuide(req, res, next) {
+  shoppingGuide(req, res) {
     res.render("mua-hang");
   }
-  //[GET] /gioi-thieu
-  show(req, res, next) {
+
+  show(req, res) {
     res.render("gioi-thieu");
   }
 
-  //[GET] /tin-tuc
+  // [GET] /tin-tuc
   showNews(req, res, next) {
-    Story.find({}).then((stories) => {
-      res.render("news", {
-        stories: mutipleMongooseToObject(stories),
-      });
-    });
-  }
-
-  //[GET] /tin-tuc/:slug
-  showNewsDetail(req, res, next) {
-    Story.findOne({ slug: req.params.slug })
-      .then((story) => {
-        console.log(story);
-        res.render("news/show", {
-          story: mongooseToObjiect(story),
+    Story.find({})
+      .then(stories => {
+        res.render("news", {
+          stories: mutipleMongooseToObject(stories),
         });
       })
       .catch(next);
   }
 
-  //[GET] /gio-hang
-  getCart(req, res, next) {
-    req.user.populate("cart.items.productId").then((user) => {
-      console.log(user);
-
-      // Lọc bỏ sản phẩm bị null
-      user.cart.items = user.cart.items.filter((p) => p.productId);
-
-      // Tính tổng giá trị giỏ hàng
-      let total = user.cart.items.reduce(
-        (sum, p) => sum + p.quantity * p.productId.price,
-        0
-      );
-
-      res.render("cart", {
-        products: mutipleMongooseToObject(user.cart.items),
-        total: total,
-      });
-    });
+  // [GET] /tin-tuc/:slug
+  showNewsDetail(req, res, next) {
+    Story.findOne({ slug: req.params.slug })
+      .then(story => {
+        res.render("news/show", {
+          story: mongooseToObject(story),
+        });
+      })
+      .catch(next);
   }
 
-  //[POST] /gio-hang
-  addCart(req, res, next) {
-    const prodId = req.body.productId;
-    const quantity = req.body.quantity;
-    Product.findById(prodId)
-      .then((product) => {
-        return req.user.addToCart(product, quantity);
+  // [GET] /gio-hang
+  getCart(req, res, next) {
+    req.user
+      .populate("cart.items.productId")
+      .then(user => {
+        const cartItems = user.cart.items
+          .filter(item => item.productId)
+          .map(item => ({
+            ...item.productId.toObject(),
+            quantity: item.quantity,
+          }));
+
+        const total = cartItems.reduce((sum, item) => {
+          return sum + item.quantity * (item.price || 0);
+        }, 0);
+
+        res.render("cart", {
+          products: cartItems,
+          total: total,
+          user: req.user,
+        });
       })
-      .then((result) => {
+      .catch(next);
+  }
+
+  // [POST] /gio-hang
+  addCart(req, res, next) {
+    const prodId = req.body.productId; // ✅ GIỮ DẠNG STRING (ObjectId)
+    const quantity = parseInt(req.body.quantity) || 1;
+
+    console.log("📦 [POST] /gio-hang - productId:", prodId, "quantity:", quantity);
+
+    Product.findById(prodId)
+    .then((product) => {
+      if (!product || product._id == null) {
+        throw new Error("Không tìm thấy sản phẩm.");
+      }
+  
+      console.log("✅ Tìm thấy sản phẩm:", product.name, "| ID =", product._id);
+      return req.user.addToCart(product, quantity);
+    })
+  
+      .then(() => {
         req.session.user = req.user;
-        return req.session.save(() => {
+        req.session.save(() => {
           res.redirect("/gio-hang");
         });
+      })
+      .catch(err => {
+        console.error("🔥 Lỗi thêm giỏ hàng:", err);
+        res.status(500).send("Lỗi khi thêm vào giỏ hàng.");
       });
   }
 
-  //[POST] /cart-delete-item
+  // [POST] /cart-delete-item
   postCartDeleteProduct = (req, res, next) => {
     const prodId = req.body.productId;
-    req.user.removeFromCart(prodId).then(() => {
-      req.session.user = req.user;
-      return req.session.save(() => {
-        res.redirect("/gio-hang");
-      });
-    });
+
+    req.user
+      .removeFromCart(prodId)
+      .then(() => {
+        req.session.user = req.user;
+        req.session.save(() => {
+          res.redirect("/gio-hang");
+        });
+      })
+      .catch(next);
   };
 
-  //[POST] /create-order
+  // [POST] /create-order
   postOrder = (req, res, next) => {
     req.user
       .populate("cart.items.productId")
-      .then((user) => {
-        const products = user.cart.items.map((i) => {
-          return { quantity: i.quantity, product: { ...i.productId._doc } };
-        });
-        console.log(products);
-        let total = 0;
-        products.forEach((p) => {
-          total += p.quantity * p.product.price;
-        });
+      .then(user => {
+        const products = user.cart.items
+          .filter(i => i.productId)
+          .map(i => ({
+            quantity: i.quantity,
+            product: { ...i.productId._doc },
+          }));
+
+        const total = products.reduce((sum, p) => {
+          return sum + p.quantity * (p.product.price || 0);
+        }, 0);
+
         const order = new Order({
           user: {
             email: req.user.email,
@@ -147,50 +161,52 @@ class SiteController {
           products: products,
           tong_tien: total,
         });
+
         return order.save();
       })
-      .then((result) => {
-        return req.user.clearCart();
-      })
+      .then(() => req.user.clearCart())
       .then(() => {
         req.session.user = req.user;
-        return req.session.save(() => {
+        req.session.save(() => {
           res.redirect("/don-hang");
         });
-      });
+      })
+      .catch(next);
   };
 
-  chatRealTime = (req, res, next) => {
+  // [GET] /chat
+  chatRealTime = (req, res) => {
     res.render("chat");
   };
 
-  //[GET] /don-hang
+  // [GET] /don-hang
   getPurchase(req, res, next) {
-    Order.find({ "user.userId": req.user._id }).then((orders) => {
-      res.render("purchase", {
-        orders: mutipleMongooseToObject(orders),
-      });
-    });
-  }
-
-  //[GET] /danh-gia/:slug
-  getEvaluate(req, res, next) {
-    Product.findOne({ slug: req.params.slug })
-      .then((product) => {
-        res.render("evaluate", {
-          product: mongooseToObjiect(product),
+    Order.find({ "user.userId": req.user._id })
+      .then(orders => {
+        res.render("purchase", {
+          orders: mutipleMongooseToObject(orders),
         });
       })
       .catch(next);
   }
 
-  //[POST] /danh-gia
+  // [GET] /danh-gia/:slug
+  getEvaluate(req, res, next) {
+    Product.findOne({ slug: req.params.slug })
+      .then(product => {
+        res.render("evaluate", {
+          product: mongooseToObject(product),
+        });
+      })
+      .catch(next);
+  }
+
+  // [POST] /danh-gia
   postEvaluate(req, res, next) {
     req.body.imgRating = req.files
-      .map((file) => path.join("uploads", file.filename).replace(/\\/g, "/"))
+      .map(file => path.join("uploads", file.filename).replace(/\\/g, "/"))
       .join(",");
 
-    console.log(req.body);
     const rating = new Rating({
       rating: req.body.rating,
       comment: req.body.comment,
@@ -207,22 +223,24 @@ class SiteController {
     rating
       .save()
       .then(() => {
-        console.log([rating._id]);
-        Product.updateOne(
+        return Product.updateOne(
           { _id: req.body.productId },
           { $push: { danh_gia: [{ ratingId: rating._id }] } }
-        ).then(() => res.redirect("/don-hang"));
+        );
       })
+      .then(() => res.redirect("/don-hang"))
       .catch(next);
   }
 
-  //[GET] /tai-khoan
+  // [GET] /tai-khoan
   showProfile(req, res, next) {
-    User.findOne({ email: req.user.email }).then((user) => {
-      res.render("profile", {
-        user: mongooseToObjiect(user),
-      });
-    });
+    User.findOne({ email: req.user.email })
+      .then(user => {
+        res.render("profile", {
+          user: mongooseToObject(user),
+        });
+      })
+      .catch(next);
   }
 
   // [POST] /tai-khoan
@@ -240,8 +258,8 @@ class SiteController {
       .catch(next);
   }
 
-  //[GET] /
-  index(req, res, next) {
+  // [GET] /
+  index(req, res) {
     res.render("home");
   }
 }
